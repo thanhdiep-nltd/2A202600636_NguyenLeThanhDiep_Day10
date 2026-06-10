@@ -57,3 +57,37 @@ def run_agent_question(agent: Any, question: str) -> str:
         return ""
     final_message = messages[-1]
     return getattr(final_message, "content", str(final_message))
+
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    # Add src directory to PYTHONPATH automatically if running directly
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    
+    from core.config import load_settings
+    from retrieval.index import LocalEmbeddingIndex
+    
+    print("Loading settings...")
+    settings = load_settings()
+    
+    print("Loading Local Embedding Index...")
+    try:
+        index = LocalEmbeddingIndex.load(settings)
+        print("Index loaded successfully.")
+    except Exception as e:
+        print(f"Error loading index: {e}. Build the index first by running index.py.", file=sys.stderr)
+        sys.exit(1)
+        
+    print("Building Agent...")
+    try:
+        agent = build_agent(settings, index)
+        print("Agent built successfully.")
+        
+        question = "What is the primary focus of the paper 'Operationalizing Reliability Gaps in Large Language Models'?"
+        print(f"\nAsking agent: '{question}'")
+        answer = run_agent_question(agent, question)
+        print(f"Agent Answer:\n{answer}")
+    except Exception as e:
+        print(f"\nCould not run Agent: {e}")
+        print("Tip: Make sure you have set the appropriate LLM API key in your .env file.")

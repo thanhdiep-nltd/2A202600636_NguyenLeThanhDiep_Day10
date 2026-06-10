@@ -54,3 +54,36 @@ def answer_question(question: str, settings: Settings, index: LocalEmbeddingInde
         retrieved_contexts=[item.content for item in retrieved],
         retrieved_titles=[item.title for item in retrieved],
     )
+
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    # Add src directory to PYTHONPATH automatically if running directly
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    
+    from core.config import load_settings
+    from retrieval.index import LocalEmbeddingIndex
+    
+    print("Loading settings...")
+    settings = load_settings()
+    
+    print("Loading Local Embedding Index...")
+    try:
+        index = LocalEmbeddingIndex.load(settings)
+        print("Index loaded successfully.")
+    except Exception as e:
+        print(f"Error loading index: {e}. Build the index first by running index.py.", file=sys.stderr)
+        sys.exit(1)
+        
+    questions = [
+        "Who authored the paper titled 'Operationalizing Reliability Gaps in Large Language Models: A Semi-Systematic Evidence Map of Reasoning, Factuality, Evaluation, and Retrieval-Augmented Generation'?",
+        "When was the paper titled 'Operationalizing Reliability Gaps in Large Language Models: A Semi-Systematic Evidence Map of Reasoning, Factuality, Evaluation, and Retrieval-Augmented Generation' published?",
+        "Summarize the main topics of retrieval augmented generation reliability."
+    ]
+    
+    for q in questions:
+        print(f"\nQuestion: {q}")
+        res = answer_question(q, settings, index)
+        print(f"Answer: {res.answer}")
+        print(f"Retrieved Doc ID: {res.retrieved_doc_ids[0] if res.retrieved_doc_ids else 'None'}")
