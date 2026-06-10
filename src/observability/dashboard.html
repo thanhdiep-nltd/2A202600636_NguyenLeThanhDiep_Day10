@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Data Observability Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.15);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.15);
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.15);
+            --warning: #f59e0b;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 40%);
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 1.5rem;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .refresh-btn {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid var(--primary);
+            color: var(--text-main);
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .refresh-btn:hover {
+            background: var(--primary);
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        .grid-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-success {
+            background: var(--success-glow);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .badge-danger {
+            background: var(--danger-glow);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .grid-charts-details {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .grid-charts-details {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-container {
+            position: relative;
+            height: 350px;
+            width: 100%;
+        }
+
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            margin-top: 0.5rem;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        td {
+            font-size: 0.95rem;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .status-passed { background-color: var(--success); }
+        .status-failed { background-color: var(--danger); }
+
+        .log-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .log-item {
+            display: flex;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            font-size: 0.9rem;
+        }
+
+        .log-label {
+            color: var(--text-muted);
+        }
+
+        .log-val {
+            font-weight: 600;
+            color: var(--warning);
+        }
+
+        .log-val-zero {
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>RAG Pipeline Observability Dashboard</h1>
+                <p style="color: var(--text-muted); margin-top: 0.25rem;">Real-time Baseline, Corruption, and Recovery Analytics</p>
+            </div>
+            <button class="refresh-btn" onclick="fetchData()">Reload Data</button>
+        </header>
+
+        <!-- Step 1: Overall Quality Cards -->
+        <div class="grid-stats">
+            <!-- Baseline Status -->
+            <div class="card" id="card-baseline">
+                <div class="card-title">
+                    <span>Baseline Pipeline</span>
+                    <span id="badge-baseline" class="badge">Checking...</span>
+                </div>
+                <div class="metric-value" id="val-baseline-hit">-</div>
+                <div class="metric-sub">Retrieval Hit Rate</div>
+                <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                    <div>
+                        <div style="font-size: 1.1rem; font-weight: 600;" id="val-baseline-f1">-</div>
+                        <div class="metric-sub">Token F1</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.1rem; font-weight: 600;" id="val-baseline-acc">-</div>
+                        <div class="metric-sub">Judge Acc</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Corrupted Status -->
+            <div class="card" id="card-corrupted">
+                <div class="card-title">
+                    <span>Corrupted Pipeline</span>
+                    <span id="badge-corrupted" class="badge">Checking...</span>
+                </div>
+                <div class="metric-value" id="val-corrupted-hit" style="color: var(--danger);">-</div>
+                <div class="metric-sub">Retrieval Hit Rate</div>
+                <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                    <div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: var(--danger);" id="val-corrupted-f1">-</div>
+                        <div class="metric-sub">Token F1</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: var(--danger);" id="val-corrupted-acc">-</div>
+                        <div class="metric-sub">Judge Acc</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Repaired Status -->
+            <div class="card" id="card-repaired">
+                <div class="card-title">
+                    <span>Repaired Pipeline</span>
+                    <span id="badge-repaired" class="badge">Checking...</span>
+                </div>
+                <div class="metric-value" id="val-repaired-hit" style="color: var(--success);">-</div>
+                <div class="metric-sub">Retrieval Hit Rate</div>
+                <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                    <div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: var(--success);" id="val-repaired-f1">-</div>
+                        <div class="metric-sub">Token F1</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: var(--success);" id="val-repaired-acc">-</div>
+                        <div class="metric-sub">Judge Acc</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Charts and Detailed Tables -->
+        <div class="grid-charts-details">
+            <!-- Chart Card -->
+            <div class="card">
+                <div class="card-title" style="border-bottom: 1px solid var(--card-border); padding-bottom: 0.75rem;">
+                    <span>QA Performance Metrics Comparison</span>
+                </div>
+                <div class="chart-container" style="margin-top: 1rem;">
+                    <canvas id="metricsChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Corruption Log / Ingestion Details -->
+            <div class="card">
+                <div class="card-title" style="border-bottom: 1px solid var(--card-border); padding-bottom: 0.75rem;">
+                    <span>Simulated Corruption Log</span>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <ul class="log-list" id="corruption-log-list">
+                        <li class="log-item"><span class="log-label">Status</span><span class="log-val">No log found</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Observability Details Table -->
+        <div class="card">
+            <div class="card-title" style="border-bottom: 1px solid var(--card-border); padding-bottom: 0.75rem;">
+                <span>Detailed Data Quality & Freshness Observability Matrix</span>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Phase</th>
+                            <th>Total Rows</th>
+                            <th>Overall Quality Status</th>
+                            <th>Null paper_id / title</th>
+                            <th>Stale Row Count</th>
+                            <th>Is Fresh Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="quality-table-body">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-muted);">No quality details loaded</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let metricsChart = null;
+
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                renderDashboard(data);
+            } catch (err) {
+                console.error("Error fetching data:", err);
+            }
+        }
+
+        function renderDashboard(data) {
+            // 1. Render stats cards
+            const baseline = data.baseline_metrics;
+            const corrupted = data.corrupted_metrics;
+            const repaired = data.repaired_metrics;
+
+            // Fill baseline
+            if (baseline) {
+                document.getElementById('badge-baseline').innerText = "Active";
+                document.getElementById('badge-baseline').className = "badge badge-success";
+                document.getElementById('val-baseline-hit').innerText = (baseline.retrieval_hit_rate * 100).toFixed(1) + "%";
+                document.getElementById('val-baseline-f1').innerText = baseline.mean_token_f1.toFixed(3);
+                document.getElementById('val-baseline-acc').innerText = (baseline.judge_accuracy * 100).toFixed(1) + "%";
+            }
+            
+            // Fill corrupted
+            if (corrupted) {
+                document.getElementById('badge-corrupted').innerText = "Corrupted";
+                document.getElementById('badge-corrupted').className = "badge badge-danger";
+                document.getElementById('val-corrupted-hit').innerText = (corrupted.retrieval_hit_rate * 100).toFixed(1) + "%";
+                document.getElementById('val-corrupted-f1').innerText = corrupted.mean_token_f1.toFixed(3);
+                document.getElementById('val-corrupted-acc').innerText = (corrupted.judge_accuracy * 100).toFixed(1) + "%";
+            }
+
+            // Fill repaired
+            if (repaired) {
+                document.getElementById('badge-repaired').innerText = "Repaired";
+                document.getElementById('badge-repaired').className = "badge badge-success";
+                document.getElementById('val-repaired-hit').innerText = (repaired.retrieval_hit_rate * 100).toFixed(1) + "%";
+                document.getElementById('val-repaired-f1').innerText = repaired.mean_token_f1.toFixed(3);
+                document.getElementById('val-repaired-acc').innerText = (repaired.judge_accuracy * 100).toFixed(1) + "%";
+            }
+
+            // 2. Render charts
+            renderChart(baseline, corrupted, repaired);
+
+            // 3. Render corruption log
+            const log = data.corruption_log;
+            const logList = document.getElementById('corruption-log-list');
+            logList.innerHTML = '';
+            if (log) {
+                const keys = [
+                    { k: "original_rows", label: "Original Rows Count" },
+                    { k: "dropped_latest", label: "Dropped Latest Papers" },
+                    { k: "blanked_summaries", label: "Blanked Summary Rows" },
+                    { k: "injected_noise", label: "Noise-injected Summaries" },
+                    { k: "truncated_titles", label: "Truncated Titles" },
+                    { k: "stale_dates", label: "Forced Stale Dates" },
+                    { k: "duplicates_added", label: "Duplicated Row Count" },
+                    { k: "final_rows", label: "Final Corrupted Rows" }
+                ];
+                keys.forEach(item => {
+                    const val = log[item.k] !== undefined ? log[item.k] : 0;
+                    const isZero = val === 0;
+                    logList.innerHTML += `
+                        <li class="log-item">
+                            <span class="log-label">${item.label}</span>
+                            <span class="${isZero ? 'log-val-zero' : 'log-val'}">${val}</span>
+                        </li>
+                    `;
+                });
+            } else {
+                logList.innerHTML = `<li class="log-item"><span class="log-label">Status</span><span class="log-val">No log generated yet.</span></li>`;
+            }
+
+            // 4. Render quality table
+            const tableBody = document.getElementById('quality-table-body');
+            tableBody.innerHTML = '';
+
+            const phases = [
+                { name: "Baseline (Clean)", quality: data.baseline_quality, isCorrupt: false },
+                { name: "Corrupted Data", quality: data.corrupted_quality, isCorrupt: true },
+                { name: "Repaired Data", quality: data.repaired_quality, isCorrupt: false }
+            ];
+
+            phases.forEach(p => {
+                if (p.quality) {
+                    const q = p.quality;
+                    const qSuccess = q.success;
+                    const nullChecks = q.checks.null_values;
+                    const freshness = q.checks.freshness;
+                    
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td style="font-weight: 500;">${p.name}</td>
+                            <td>${q.total_rows}</td>
+                            <td>
+                                <span class="status-dot ${qSuccess ? 'status-passed' : 'status-failed'}"></span>
+                                ${qSuccess ? 'PASSED' : 'FAILED'}
+                            </td>
+                            <td>${nullChecks.paper_id_null_count + nullChecks.title_null_count}</td>
+                            <td>${freshness.stale_row_count}</td>
+                            <td>
+                                <span class="status-dot ${freshness.success ? 'status-passed' : 'status-failed'}"></span>
+                                ${freshness.success ? 'FRESH' : 'STALE'}
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td style="font-weight: 500;">${p.name}</td>
+                            <td colspan="5" style="text-align: center; color: var(--text-muted);">Not executed yet</td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        function renderChart(baseline, corrupted, repaired) {
+            if (metricsChart) {
+                metricsChart.destroy();
+            }
+
+            const ctx = document.getElementById('metricsChart').getContext('2d');
+            
+            const labels = ['Retrieval Hit Rate', 'Mean Token F1', 'Judge Accuracy'];
+            const dataBaseline = baseline ? [baseline.retrieval_hit_rate, baseline.mean_token_f1, baseline.judge_accuracy] : [0, 0, 0];
+            const dataCorrupted = corrupted ? [corrupted.retrieval_hit_rate, corrupted.mean_token_f1, corrupted.judge_accuracy] : [0, 0, 0];
+            const dataRepaired = repaired ? [repaired.retrieval_hit_rate, repaired.mean_token_f1, repaired.judge_accuracy] : [0, 0, 0];
+
+            metricsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Baseline (Clean)',
+                            data: dataBaseline,
+                            backgroundColor: '#3b82f6',
+                            borderColor: '#3b82f6',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Corrupted Data',
+                            data: dataCorrupted,
+                            backgroundColor: '#ef4444',
+                            borderColor: '#ef4444',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Repaired Data',
+                            data: dataRepaired,
+                            backgroundColor: '#10b981',
+                            borderColor: '#10b981',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1.0,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: '#9ca3af',
+                                callback: function(value) {
+                                    return (value * 100) + '%';
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#9ca3af'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#f3f4f6',
+                                font: {
+                                    family: 'Outfit'
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += (context.parsed.y * 100).toFixed(1) + '%';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initial fetch
+        fetchData();
+    </script>
+</body>
+</html>
