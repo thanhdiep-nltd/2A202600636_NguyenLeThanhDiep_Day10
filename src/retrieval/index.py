@@ -172,3 +172,39 @@ class LocalEmbeddingIndex:
         if needle in self.documents_by_title:
             return self.documents_by_title[needle]
         return None
+
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+    # Add src directory to PYTHONPATH automatically if running directly
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    
+    from core.config import load_settings
+    
+    print("Loading settings...")
+    settings = load_settings()
+    
+    clean_path = settings.paths.clean_csv
+    print(f"Loading cleaned papers from: {clean_path}")
+    if not clean_path.exists():
+        print(f"Error: Cleaned papers file does not exist at {clean_path}. Run cleaning.py first.", file=sys.stderr)
+        sys.exit(1)
+        
+    df = pd.read_csv(clean_path)
+    print(f"Loaded {len(df)} papers.")
+    
+    print("Building Local Embedding Index in ChromaDB...")
+    index = LocalEmbeddingIndex.build(df, settings)
+    print("Index build completed successfully!")
+    
+    # Test search
+    test_query = "large language model reliability"
+    print(f"\nRunning test query: '{test_query}'")
+    results = index.search(test_query, top_k=2)
+    for idx, r in enumerate(results):
+        print(f"\nResult {idx+1}:")
+        print(f"Paper ID: {r.paper_id}")
+        print(f"Title: {r.title}")
+        print(f"Score: {r.score:.4f}")
+        print(f"Snippet: {r.content[:150]}...")
