@@ -1,0 +1,28 @@
+{
+  "report_name": "repaired_quality",
+  "success": true,
+  "total_rows": 23,
+  "checks": {
+    "null_values": {
+      "paper_id_null_count": 0,
+      "title_null_count": 0,
+      "success": true
+    },
+    "uniqueness": {
+      "paper_id_unique": true,
+      "success": true
+    },
+    "summary_length": {
+      "summary_too_short_count": 0,
+      "min_length": 1037,
+      "max_length": 2506,
+      "mean_length": 1805.4782608695652,
+      "success": true
+    },
+    "freshness": {
+      "stale_row_count": 0,
+      "freshness_threshold_days": 180,
+      "success": true
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "original_rows": 23,
+  "dropped_latest": 3,
+  "blanked_summaries": 2,
+  "injected_noise": 2,
+  "truncated_titles": 2,
+  "stale_dates": 2,
+  "duplicates_added": 2,
+  "final_rows": 22
+}
